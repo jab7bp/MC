@@ -168,6 +168,7 @@ TH1D *h_Q2, *h_E_ep, *h_E_pp;
 
 TH1D *h_simc_dx, *h_simc_dx_cut, *h_simc_dx_wcut, *h_simc_dx_fcut, *h_simc_dx_wcut_fcut;
 TH1D *h_simc_dy, *h_simc_dy_cut, *h_simc_dy_wcut;
+TH2D *h_simc_W_dx, *h_simc_W2_dx;
 TH2D *h_simc_dxdy, *h_simc_dxdy_cut, *h_simc_dxdy_wcut, *h_simc_dxdy_ncut, *h_simc_dxdy_pcut, *h_simc_dxdy_fcut;
 
 //SEPRATED HISTOGRAMS BASED ON HADRON
@@ -179,6 +180,10 @@ TH2D *h_E_ecorr_vs_vert;
 TH2D *h_xy, *h_xy_cut, *h_xy_fcut, *h_xy_cut_p, *h_xy_cut_n, *h_PAngleCorr_theta, *h_PAngleCorr_phi;
 
 TH1D *h_mc_p_weight, *h_mc_n_weight, *h_mc_p_final_weight, *h_mc_n_final_weight, *h_mc_n_p_weight_Ratio, *h_mc_n_p_final_weight_Ratio;
+TH1D *h_mc_simc_Q2, *h_mc_simc_nu, *h_mc_simc_epsilon, *h_mc_simc_Ebeam, *h_mc_simc_p_n, *h_mc_simc_theta_n, *h_mc_simc_p_e, *h_mc_simc_theta_e;
+TH1D *h_mc_simc_Q2_wcut, *h_mc_simc_nu_wcut, *h_mc_simc_epsilon_wcut, *h_mc_simc_Ebeam_wcut;
+TH1D *h_mc_simc_p_n_wcut, *h_mc_simc_theta_n_wcut, *h_mc_simc_p_e_wcut, *h_mc_simc_theta_e_wcut;
+
 
 //BRANCH VARIABLES
 
@@ -189,6 +194,7 @@ double bb_tgt_x[maxTracks], bb_tgt_y[maxTracks], bb_tgt_th[maxTracks], bb_tgt_ph
 double bb_tr_n, bb_ps_x, bb_ps_y, bb_ps_e, bb_sh_x, bb_sh_y, bb_sh_e;
 Double_t nblk, nclus, SH_nclus, PS_nclus, hcal_x, hcal_y, hcal_e;
 double mc_omega, mc_sigma, mc_fnucl, mc_Weight, luminosity, mc_luminosity, mc_genvol, mc_Final_Weight;
+double mc_simc_Q2, mc_simc_nu, mc_simc_epsilon, mc_simc_Ebeam, mc_simc_p_n, mc_simc_theta_n, mc_simc_p_e, mc_simc_theta_e;
 //variables for SIMC weights
 	//protons
 double mc_p_luminosity, mc_p_genvol, mc_p_Final_Weight;
@@ -267,9 +273,9 @@ void simc_dxdy(){
 	I_beam_str = Form("%0.2f", I_beam_uA);
 	I_beam_str.ReplaceAll(".", "");
 
-	portField = "0310";
+	portField = "0658";
 
-	outfilename = Form("rootfiles/simc_SBS%i_%s_mag%i_%suA_dxdy_trPfact_100_port%s_15_10_2023.root", kine, run_target.Data(), sbsfieldscale, I_beam_str.Data(), portField.Data() );
+	outfilename = Form("rootfiles/simc_SBS%i_%s_mag%i_%suA_dxdy_trPfact_100_port%s_08_12_2023_magcalib.root", kine, run_target.Data(), sbsfieldscale, I_beam_str.Data(), portField.Data() );
 
 	if( !plot_only ){
 
@@ -295,6 +301,8 @@ void simc_dxdy(){
 		h_W_cut = new TH1D("h_W_cut", Form("Invariant Mass W (Coin & Vert Cuts) - SBS%i = %i%%, %s; GeV", kine, sbsfieldscale, run_target.Data()), 300, 0.0, 3.0);
 		h_W_fcut = new TH1D("h_W_fcut", Form("Invariant Mass W (Fiduc. Cuts) - SBS%i = %i%%, %s; GeV", kine, sbsfieldscale, run_target.Data()), 300, 0.0, 3.0);
 
+		h_simc_W_dx = new TH2D("h_simc_W_dx", Form("Invariant Mass W vs dx - SBS%i, mag%i, %s; x_{HCal} - x_{exp} (m); GeV", kine, sbsfieldscale, run_target.Data()), 500, -2.5, 2.5, 300, 0.0, 3.0);
+		h_simc_W2_dx = new TH2D("h_simc_W2_dx", Form("Invariant Mass W^{2} vs dx - SBS%i, mag%i, %s; x_{HCal} - x_{exp} (m); GeV", kine, sbsfieldscale, run_target.Data()), 500, -2.5, 2.5, 300, 0.0, 3.0);
 		h_Wrecon = new TH1D("h_Wrecon", Form("Invariant Mass W recon - SBS%i = %i%%, %s; GeV", kine, sbsfieldscale, run_target.Data()), 300, 0.0, 3.0);
 		h_W2recon = new TH1D("h_W2recon", Form("Invariant Mass W^2 recon - SBS%i = %i%%, %s; GeV", kine, sbsfieldscale, run_target.Data()), 300, 0.0, 3.0);
 
@@ -342,6 +350,23 @@ void simc_dxdy(){
 			h_mc_n_final_weight = new TH1D("h_mc_n_final_weight", "mc_Final_weight calculated for neutron", 100000, 0.0, 0.1);
 			h_mc_n_p_final_weight_Ratio = new TH1D("h_mc_n_p_final_weight_Ratio", "ratio of mc final weights: neutron/proton", 250, 0, 5);			
 		}
+		//Various SIMC variables
+		h_mc_simc_Q2 = new TH1D("h_mc_simc_Q2", Form("simc calculated Q^{2} momentum transfer - SBS%i Mag%i %s; Momentum-Transfer Q^{2} (GeV); Entries (N)", kine, sbsfieldscale, run_target.Data()), 1000, 0, 10);
+		h_mc_simc_epsilon = new TH1D("h_mc_simc_epsilon", Form("simc calcualted virtual photon polarization, #epsilon - SBS%i Mag%i %s; Virtual Photon Polarization, #epsilon (-); Entries (N)", kine, sbsfieldscale, run_target.Data()), 150, 0.0, 1.5);
+		h_mc_simc_Ebeam = new TH1D("h_mc_simc_Ebeam", Form("simc calcualted beam energy, E_{Beam} - SBS%i Mag%i %s; Beam Energy (GeV); Entries (N)", kine, sbsfieldscale, run_target.Data()), 1000, 0, 10.0);
+		h_mc_simc_p_n = new TH1D("h_mc_simc_p_n", Form("simc calculated scattered nucleon momentum, p_{N} - SBS%i Mag%i %s; Nucleon Momentum (GeV); Entries (N)", kine, sbsfieldscale, run_target.Data()), 1000, 0., 10.0);
+		h_mc_simc_theta_n = new TH1D("h_mc_simc_theta_n", Form("simc calculated scattered nucleon polar angle (DEG), #theta_{N} - SBS%i Mag%i %s; Nucleon Polar Angle (Deg); Entries (N)", kine, sbsfieldscale, run_target.Data()), 900, 0.0, 90);
+		h_mc_simc_p_e = new TH1D("h_mc_simc_p_e", Form("simc calcualted scattered electron momentum - SBS%i Mag%i %s; Electron Momentum (GeV); Entries (N)", kine, sbsfieldscale, run_target.Data()), 1000, 0, 10.0);
+		h_mc_simc_theta_e = new TH1D("h_MC_simc_theta_e", Form("simc calcualted scattered electron polar angle (DEG) - SBS%i Mag%i %s; Electron Polar Angle (Deg); Entries (N)", kine, sbsfieldscale, run_target.Data()), 900, 0.0, 90);
+
+		//with cut on W
+		h_mc_simc_Q2_wcut = new TH1D("h_mc_simc_Q2_wcut", Form("simc calculated Q^{2} momentum transfer (W cut) - SBS%i Mag%i %s; Momentum-Transfer Q^{2} (GeV); Entries (N)", kine, sbsfieldscale, run_target.Data()), 1000, 0, 10);
+		h_mc_simc_epsilon_wcut = new TH1D("h_mc_simc_epsilon_wcut", Form("simc calcualted virtual photon polarization, #epsilon (W cut) - SBS%i Mag%i %s; Virtual Photon Polarization, #epsilon (-); Entries (N)", kine, sbsfieldscale, run_target.Data()), 150, 0.0, 1.5);
+		h_mc_simc_Ebeam_wcut = new TH1D("h_mc_simc_Ebeam_wcut", Form("simc calcualted beam energy, E_{Beam} (W cut) - SBS%i Mag%i %s; Beam Energy (GeV); Entries (N)", kine, sbsfieldscale, run_target.Data()), 1000, 0, 10.0);
+		h_mc_simc_p_n_wcut = new TH1D("h_mc_simc_p_n_wcut", Form("simc calculated scattered nucleon momentum, p_{N} (W cut) - SBS%i Mag%i %s; Nucleon Momentum (GeV); Entries (N)", kine, sbsfieldscale, run_target.Data()), 1000, 0., 10.0);
+		h_mc_simc_theta_n_wcut = new TH1D("h_mc_simc_theta_n_wcut", Form("simc calcualted scattered nucleon polar angle (DEG), #theta_{N} (W cut) - SBS%i Mag%i %s; Nucleon Polar Angle (Deg); Entries (N)", kine, sbsfieldscale, run_target.Data()), 900, 0.0, 90);
+		h_mc_simc_p_e_wcut = new TH1D("h_mc_simc_p_e_wcut", Form("simc calcualted scattered electron momentum (W cut) - SBS%i Mag%i %s; Electron Momentum (GeV); Entries (N)", kine, sbsfieldscale, run_target.Data()), 1000, 0, 10.0);
+		h_mc_simc_theta_e_wcut = new TH1D("h_MC_simc_theta_e_wcut", Form("simc calcualted scattered electron polar angle (DEG) (W cut) - SBS%i Mag%i %s; Electron Polar Angle (Deg); Entries (N)", kine, sbsfieldscale, run_target.Data()), 900, 0.0, 90);
 
 
 		cout << "finished. " << endl << endl;
@@ -418,7 +443,11 @@ void simc_dxdy(){
 				// proton_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_proton_mag70mod0312_500uA_elas_100k_31_07_2023_job*";
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0301_500uA_elas_250k_24_09_2023_job*.root";
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0301_500uA_elas_250k_08_10_2023_job*.root";
-				proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0310_500uA_elas_250k_16_10_2023_job*.root";
+				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0310_500uA_elas_250k_16_10_2023_job*.root";
+				//***
+				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0310_500uA_elas_250k_03_12_2023_job*.root";
+				proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0658_500uA_elas_250k_04_11_2023_job*.root";
+				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0800_500uA_elas_100k_04_11_2023_job*.root";
 				proton_infile_basename = Form("%s", proton_infile.Data() );
 				proton_infile_basename.ReplaceAll("*.root", "");
 				cout << "Adding proton infile names to vector. " << endl;
@@ -441,7 +470,10 @@ void simc_dxdy(){
 				// neutron_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_neutron_mag70mod0312_500uA_elas_100k_31_07_2023_job*";
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0301_500uA_elas_250k_24_09_2023_job*.root";
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0301_500uA_elas_250k_08_10_2023_job*.root";
-				neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0310_500uA_elas_250k_16_10_2023_job*.root";
+				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0310_500uA_elas_250k_16_10_2023_job*.root";
+				//***
+				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0310_500uA_elas_250k_03_12_2023_job*.root";
+				neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0658_500uA_elas_250k_04_11_2023_job*.root";
 				neutron_infile_basename = Form("%s", neutron_infile.Data() );
 				neutron_infile_basename.ReplaceAll("*.root", "");
 				cout << "Adding neutron infile names to vector. " << endl;
@@ -455,7 +487,7 @@ void simc_dxdy(){
 				neutron_infile_cnt = neutron_infile_vec.size();
 				nucleon_infile_cnt[0] = neutron_infile_cnt;
 
-				cout << "Number of files found for proton simulation: " << neutron_infile_cnt << endl;
+				cout << "Number of files found for neutron simulation: " << neutron_infile_cnt << endl;
 
 			}
 		
@@ -467,7 +499,9 @@ void simc_dxdy(){
 				cout << "------------------------------------------" << endl;
 				// proton_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_proton_mag70mod0312_500uA_elas_100k_31_07_2023_job*";
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port0314_1200uA_elas_250k_19_09_2023_job*.root";
-				proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port0314_1200uA_elas_250k_08_10_2023_job*.root";
+				//
+				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port0314_1200uA_elas_250k_08_10_2023_job*.root";
+				proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port0665_1200uA_elas_250k_08_10_2023_job*.root";
 				proton_infile_basename = Form("%s", proton_infile.Data() );
 				proton_infile_basename.ReplaceAll("*.root", "");
 				cout << "Adding proton infile names to vector. " << endl;
@@ -489,7 +523,9 @@ void simc_dxdy(){
 				cout << "------------------------------------------" << endl;
 				// neutron_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_neutron_mag70mod0312_500uA_elas_100k_31_07_2023_job*";
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port0314_1200uA_elas_250k_19_09_2023_job*.root";
-				neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port0314_1200uA_elas_250k_08_10_2023_job*.root";
+				///
+				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port0314_1200uA_elas_250k_08_10_2023_job*.root";
+				neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port0665_1200uA_elas_250k_08_10_2023_job*.root";
 				neutron_infile_basename = Form("%s", neutron_infile.Data() );
 				neutron_infile_basename.ReplaceAll("*.root", "");
 				cout << "Adding neutron infile names to vector. " << endl;
@@ -583,8 +619,24 @@ void simc_dxdy(){
 
 		if( !match_file_cnts ){
 			cout << "Adding all proton and neutron simulation files to TChain... " << endl;
-			TC->Add(Form("%s/%s", rootfile_dir.Data(), neutron_infile.Data()));
-			TC->Add(Form("%s/%s", rootfile_dir.Data(), proton_infile.Data()));
+			// TC->Add(Form("%s/%s", rootfile_dir.Data(), neutron_infile.Data()));
+			// TC->Add(Form("%s/%s", rootfile_dir.Data(), proton_infile.Data()));
+
+			if( kine == 9 ){
+				for( int p = 0; p < 200; p++ ){
+					TC->Add(proton_infile_vec[p].Data());
+				}
+				for( int n = 0; n < 233; n++ ){
+					TC->Add(neutron_infile_vec[n].Data());
+				}				
+			}
+			// if( true ){
+			// 	for( size_t p = 0; p < proton_infile_vec.size(); p++ ){
+			// 		TC->Add(proton_infile_vec[p].Data());
+			// 		TC->Add(neutron_infile_vec[p].Data());
+			// 	}
+			// }
+
 		}
 
 		if( match_file_cnts ){
@@ -637,6 +689,15 @@ void simc_dxdy(){
 		TC->SetBranchStatus( "MC.simc_sigma", 1 );
 		TC->SetBranchStatus( "MC.simc_fnucl", 1);
 		TC->SetBranchStatus( "MC.simc_Weight", 1);
+		TC->SetBranchStatus( "MC.simc_Q2", 1);
+		TC->SetBranchStatus( "MC.simc_nu", 1);
+		TC->SetBranchStatus( "MC.simc_epsilon", 1);
+		TC->SetBranchStatus( "MC.simc_Ebeam", 1);
+		TC->SetBranchStatus( "MC.simc_p_n", 1);
+		TC->SetBranchStatus( "MC.simc_theta_n", 1);
+		TC->SetBranchStatus( "MC.simc_p_e", 1);
+		TC->SetBranchStatus( "MC.simc_theta_e", 1);
+
 
 		// HCal
 		TC->SetBranchStatus( "sbs.hcal.x", 1 );
@@ -680,6 +741,14 @@ void simc_dxdy(){
 		TC->SetBranchAddress( "MC.simc_sigma", &mc_sigma );
 		TC->SetBranchAddress( "MC.simc_fnucl", &mc_fnucl );
 		TC->SetBranchAddress( "MC.simc_Weight", &mc_Weight );
+		TC->SetBranchAddress( "MC.simc_Q2", &mc_simc_Q2);
+		TC->SetBranchAddress( "MC.simc_nu", &mc_simc_nu);
+		TC->SetBranchAddress( "MC.simc_epsilon", &mc_simc_epsilon);
+		TC->SetBranchAddress( "MC.simc_Ebeam", &mc_simc_Ebeam);
+		TC->SetBranchAddress( "MC.simc_p_n", &mc_simc_p_n);
+		TC->SetBranchAddress( "MC.simc_theta_n", &mc_simc_theta_n);
+		TC->SetBranchAddress( "MC.simc_p_e", &mc_simc_p_e);
+		TC->SetBranchAddress( "MC.simc_theta_e", &mc_simc_theta_e);
 
 		// HCal
 		TC->SetBranchAddress( "sbs.hcal.x", &hcal_x );
@@ -900,6 +969,15 @@ void simc_dxdy(){
 		      		continue;
 		      	}
 		    }
+		//SIMC branch variables
+			h_mc_simc_Q2->Fill( mc_simc_Q2 );
+			h_mc_simc_epsilon->Fill( mc_simc_epsilon );
+			h_mc_simc_Ebeam->Fill( mc_simc_Ebeam );
+			h_mc_simc_p_n->Fill( mc_simc_p_n );
+			h_mc_simc_theta_n->Fill( TMath::RadToDeg()*mc_simc_theta_n );
+			h_mc_simc_p_e->Fill( mc_simc_p_e );
+			h_mc_simc_theta_e->Fill( TMath::RadToDeg()*mc_simc_theta_e );
+
 
 	//ENERGY CALCULATIONS -- CALIBRATIONS
 		    Double_t Ep = (bb_ps_e + bb_sh_e)/(bb_tr_p[0]);
@@ -976,6 +1054,9 @@ void simc_dxdy(){
 			h_simc_dxdy->Fill( dy, dx, pn_weight );
 			h_xy->Fill( hcal_y, hcal_x );
 
+			h_simc_W_dx->Fill(dx, W, pn_weight);
+			h_simc_W2_dx->Fill(dx, pow(W, 2), pn_weight);
+
 		//Histograms by hadron
 			if( is_p ){
 				h_simc_dx_p->Fill(dx, pn_weight);
@@ -997,6 +1078,16 @@ void simc_dxdy(){
 				if( is_n ){
 					h_simc_dx_n_wcut->Fill(dx, pn_weight);
 				}
+
+			//SIMC branch variables with Wcut
+				h_mc_simc_Q2_wcut->Fill( mc_simc_Q2 );
+				h_mc_simc_epsilon_wcut->Fill( mc_simc_epsilon );
+				h_mc_simc_Ebeam_wcut->Fill( mc_simc_Ebeam );
+				h_mc_simc_p_n_wcut->Fill( mc_simc_p_n );
+				h_mc_simc_theta_n_wcut->Fill( TMath::RadToDeg()*mc_simc_theta_n );
+				h_mc_simc_p_e_wcut->Fill( mc_simc_p_e );
+				h_mc_simc_theta_e_wcut->Fill( TMath::RadToDeg()*mc_simc_theta_e );
+
 			}
 
 		//Populate BB/HCal correlation histograms from elastics
