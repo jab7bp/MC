@@ -39,6 +39,11 @@ Double_t fit_two_gaus(Double_t *x, Double_t *par2gaus){
 }
 
 bool match_file_cnts = true;
+//---debugging:
+bool select_file_cnt = false;
+int selected_file_cnt = 15;
+//------
+
 bool use_hist_file = true;
 bool plot_only = false;
 
@@ -52,7 +57,7 @@ bool calibrate = true;
 TString hadron_select = "both";
 
 //RUN Info/Parameters
-int kine = 8;
+int kine = 9;
 int sbsfieldscale = 70;
 TString run_target = "LD2";
 bool use_particle_gun = false;
@@ -75,6 +80,7 @@ TString infile, histfile;
 TFile *currentChainFile;
 TString currentChainFileName = "";
 int current_file_index = -1, current_nfile_index = -1, current_pfile_index = -1;
+int current_file_jobNum_index = -1, current_file_jobNum = -1, current_nfile_jobNum = -1, current_pfile_jobNum = -1;
 
 vector<TString> master_cut_vec;
 TString master_cut_string;
@@ -180,6 +186,8 @@ TH2D *h_E_ecorr_vs_vert;
 TH2D *h_xy, *h_xy_cut, *h_xy_fcut, *h_xy_cut_p, *h_xy_cut_n, *h_PAngleCorr_theta, *h_PAngleCorr_phi;
 
 TH1D *h_mc_p_weight, *h_mc_n_weight, *h_mc_p_final_weight, *h_mc_n_final_weight, *h_mc_n_p_weight_Ratio, *h_mc_n_p_final_weight_Ratio;
+TH1D *h_mc_p_sigma, *h_mc_n_sigma, *h_mc_np_sigma_ratio;
+TH1D *h_mc_p_sigma_weighted, *h_mc_n_sigma_weighted, *h_mc_np_sigma_ratio_weighted;
 TH1D *h_mc_simc_Q2, *h_mc_simc_nu, *h_mc_simc_epsilon, *h_mc_simc_Ebeam, *h_mc_simc_p_n, *h_mc_simc_theta_n, *h_mc_simc_p_e, *h_mc_simc_theta_e;
 TH1D *h_mc_simc_Q2_wcut, *h_mc_simc_nu_wcut, *h_mc_simc_epsilon_wcut, *h_mc_simc_Ebeam_wcut;
 TH1D *h_mc_simc_p_n_wcut, *h_mc_simc_theta_n_wcut, *h_mc_simc_p_e_wcut, *h_mc_simc_theta_e_wcut;
@@ -201,11 +209,16 @@ double mc_p_luminosity, mc_p_genvol, mc_p_Final_Weight;
 vector<double> mc_p_Final_Weight_vec = {}, mc_p_luminosity_vec = {}, mc_p_genvol_vec = {};
 int mc_p_Ntried;
 vector<int> mc_p_Ntried_vec = {};
+vector<int> mc_p_rootfile_jobnum = {};
+vector<int> mc_p_histfile_jobnum = {};
+
 	//neutrons
 double mc_n_luminosity, mc_n_genvol, mc_n_Final_Weight;
 vector<double> mc_n_Final_Weight_vec = {}, mc_n_luminosity_vec = {}, mc_n_genvol_vec = {};
 int mc_n_Ntried;
 vector<int> mc_n_Ntried_vec = {};
+vector<int> mc_n_rootfile_jobnum = {};
+vector<int> mc_n_histfile_jobnum = {};
 
 Long64_t Nevents;
 
@@ -218,9 +231,12 @@ bool is_n = false;
 TString proton_infile, proton_infile_basename, neutron_infile, neutron_infile_basename;
 vector<TString> proton_infile_vec = {};
 vector<TString> proton_histfile_vec = {};
+vector<Int_t> proton_infile_jobNum_vec = {};
 
 vector<TString> neutron_infile_vec = {};
 vector<TString> neutron_histfile_vec = {};
+vector<Int_t> neutron_infile_jobNum_vec = {};
+
 int nucleon_with_min_file_cnt; //indicator of which nucleon (p or n) has less simulation files. 0: nucleon, 1: proton
 int proton_infile_cnt = 0, neutron_infile_cnt = 0;
 vector<int> nucleon_infile_cnt = {0, 0};
@@ -228,7 +244,9 @@ TString nucleon_with_min_file_cnt_string;
 
 TH1D *hin_dx_wcut, *hin_dy_wcut;
 
-TString outfilename = "", portField = "";
+TString outfilename = "";
+TString portField = "";
+TString numEvents_simFile_str = "";
 
 void simc_dxdy(){
 
@@ -273,7 +291,16 @@ void simc_dxdy(){
 	I_beam_str = Form("%0.2f", I_beam_uA);
 	I_beam_str.ReplaceAll(".", "");
 
-	portField = "0658";
+	if( kine == 4 ){
+		portField = "0408";
+		numEvents_simFile_str = "250k"	;
+	}
+	if( kine == 8 ){
+		portField = "0657";		
+	}
+	if( kine == 9 ){
+		portField = "0666";		
+	}
 
 	outfilename = Form("rootfiles/simc_SBS%i_%s_mag%i_%suA_dxdy_trPfact_100_port%s_08_12_2023_magcalib.root", kine, run_target.Data(), sbsfieldscale, I_beam_str.Data(), portField.Data() );
 
@@ -344,6 +371,12 @@ void simc_dxdy(){
 		h_mc_p_weight = new TH1D("h_mc_p_weight", "mc_weight from tree for proton", 2000, 0.0, 0.000000002);
 		h_mc_n_weight = new TH1D("h_mc_n_weight", "mc_weight from tree for neutron", 2000, 0.0, 0.000000001);
 		h_mc_n_p_weight_Ratio = new TH1D("h_mc_n_p_weight_Ratio", "ratio of mc weights: neutron/proton", 100, 0, 1);
+		h_mc_p_sigma = new TH1D("h_mc_p_sigma", "mc sigma from tree for proton", 1000, 0.0, 10.0);
+		h_mc_n_sigma = new TH1D("h_mc_n_sigma", "mc sigma from tree for neutron", 1000, 0.0, 10.0);
+		h_mc_np_sigma_ratio = new TH1D("h_mc_np_sigma_ratio", "Ratio of sigmas for n/p from mc tree", 100, 0.0, 1.0);
+		h_mc_p_sigma_weighted = new TH1D("h_mc_p_sigma_weighted", "mc sigma from tree for proton - weighted", 1000, 0.0, 10.0);
+		h_mc_n_sigma_weighted = new TH1D("h_mc_n_sigma_weighted", "mc sigma from tree for neutron- weighted", 1000, 0.0, 10.0);
+		h_mc_np_sigma_ratio_weighted = new TH1D("h_mc_np_sigma_ratio_weighted", "Ratio of sigmas for n/p from mc tree- weighted", 100, 0.0, 1.0);
 
 		if( use_hist_file ){
 			h_mc_p_final_weight = new TH1D("h_mc_p_final_weight", "mc_Final_weight calculated for proton", 100000, 0.0, 0.1);
@@ -388,7 +421,7 @@ void simc_dxdy(){
 				// proton_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_proton_mag70mod0312_500uA_elas_100k_31_07_2023_job*";
 				// proton_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_proton_mag70mod0312_500uA_elas_500k_02_08_2023_job*";
 
-				proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port0300_1200uA_elas_100k_15_09_2023_job*.root";
+				proton_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS4_LD2_proton_mag30port%s_175uA_elas_%s_10_12_2023_job*.root", portField.Data(), numEvents_simFile_str.Data());
 				// proton_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_proton_mag70mod0312_500uA_elas_500k_02_08_2023_job10.root*";
 				proton_infile_basename = Form("%s", proton_infile.Data() );
 				proton_infile_basename.ReplaceAll("*.root", "");
@@ -411,22 +444,22 @@ void simc_dxdy(){
 				// neutron_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_neutron_mag70mod0312_500uA_elas_100k_31_07_2023_job*";
 				// neutron_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_neutron_mag70mod0312_500uA_elas_500k_02_08_2023_job*";
 				
-				neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port0300_1200uA_elas_100k_15_09_2023_job*.root";
+				neutron_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS4_LD2_neutron_mag30port%s_175uA_elas_%s_10_12_2023_job*.root", portField.Data(), numEvents_simFile_str.Data());
 				// neutron_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_neutron_mag70mod0312_500uA_elas_500k_02_08_2023_job10.root";
-				proton_infile_basename = Form("%s", proton_infile.Data() );
-				proton_infile_basename.ReplaceAll("*.root", "");
-				cout << "Adding proton infile names to vector. " << endl;
-				cout << "Adding proton infiles with basename: "<< proton_infile_basename.Data() << endl;
+				neutron_infile_basename = Form("%s", neutron_infile.Data() );
+				neutron_infile_basename.ReplaceAll("*.root", "");
+				cout << "Adding neutron infile names to vector. " << endl;
+				cout << "Adding neutron infiles with basename: "<< neutron_infile_basename.Data() << endl;
 
-				FillVectorByFilesAndDirWithPattern( rootfile_dir.Data(), proton_infile_basename.Data(), proton_infile_vec );
+				FillVectorByFilesAndDirWithPattern( rootfile_dir.Data(), neutron_infile_basename.Data(), neutron_infile_vec );
 
-				cout << "Sorting proton infile vector... " << endl;
-				sort( proton_infile_vec.begin(), proton_infile_vec.end(), CompareStringsWithNumbers );
+				cout << "Sorting neutron infile vector... " << endl;
+				sort( neutron_infile_vec.begin(), neutron_infile_vec.end(), CompareStringsWithNumbers );
 
-				proton_infile_cnt = proton_infile_vec.size();
-				nucleon_infile_cnt[1] = proton_infile_cnt;
+				neutron_infile_cnt = neutron_infile_vec.size();
+				nucleon_infile_cnt[0] = neutron_infile_cnt;
 
-				cout << "Number of files found for neutron simulation: " << proton_infile_cnt << endl;
+				cout << "Number of files found for neutron simulation: " << neutron_infile_cnt << endl;
 
 			}
 		}
@@ -446,7 +479,7 @@ void simc_dxdy(){
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0310_500uA_elas_250k_16_10_2023_job*.root";
 				//***
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0310_500uA_elas_250k_03_12_2023_job*.root";
-				proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0658_500uA_elas_250k_04_11_2023_job*.root";
+				proton_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port%s_500uA_elas_250k_04_11_2023_job*.root", portField.Data());
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0800_500uA_elas_100k_04_11_2023_job*.root";
 				proton_infile_basename = Form("%s", proton_infile.Data() );
 				proton_infile_basename.ReplaceAll("*.root", "");
@@ -473,7 +506,7 @@ void simc_dxdy(){
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0310_500uA_elas_250k_16_10_2023_job*.root";
 				//***
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0310_500uA_elas_250k_03_12_2023_job*.root";
-				neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0658_500uA_elas_250k_04_11_2023_job*.root";
+				neutron_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port%s_500uA_elas_250k_04_11_2023_job*.root", portField.Data());
 				neutron_infile_basename = Form("%s", neutron_infile.Data() );
 				neutron_infile_basename.ReplaceAll("*.root", "");
 				cout << "Adding neutron infile names to vector. " << endl;
@@ -501,7 +534,7 @@ void simc_dxdy(){
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port0314_1200uA_elas_250k_19_09_2023_job*.root";
 				//
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port0314_1200uA_elas_250k_08_10_2023_job*.root";
-				proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port0665_1200uA_elas_250k_08_10_2023_job*.root";
+				proton_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port%s_1200uA_elas_250k_08_10_2023_job*.root", portField.Data());
 				proton_infile_basename = Form("%s", proton_infile.Data() );
 				proton_infile_basename.ReplaceAll("*.root", "");
 				cout << "Adding proton infile names to vector. " << endl;
@@ -525,7 +558,7 @@ void simc_dxdy(){
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port0314_1200uA_elas_250k_19_09_2023_job*.root";
 				///
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port0314_1200uA_elas_250k_08_10_2023_job*.root";
-				neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port0665_1200uA_elas_250k_08_10_2023_job*.root";
+				neutron_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port%s_1200uA_elas_250k_08_10_2023_job*.root", portField.Data());
 				neutron_infile_basename = Form("%s", neutron_infile.Data() );
 				neutron_infile_basename.ReplaceAll("*.root", "");
 				cout << "Adding neutron infile names to vector. " << endl;
@@ -547,19 +580,43 @@ void simc_dxdy(){
 		if( use_hist_file ){
 			cout << "------------------------------------------" << endl;
 			cout << "Gathering .hist files corresponding to the proton infiles...." << endl;
+			if( proton_infile_vec.size() == 0 || neutron_infile_vec.size() == 0 ){
+				cout << "Empty infile vector...." << endl;
+				cout << "Sleeping to allow for a ctrl-c catch..." << endl;
+				sleep(20);
+				cout << "Exiting...." << endl;
+				exit(1);				
+			}
 			cout << "Number of proton files: " << proton_infile_vec.size() << ".....";
 			vector<int> missing_pfile_index = {};
 			vector<int> missing_nfile_index = {};
 
+			//We will store the job number of each input file to check against the .hist file
+			//We will store the index/position of the string _job in each nucleon filename:
+			int p_file_job_index = proton_infile_vec[0].Index("_job");
+			int n_file_job_index = neutron_infile_vec[0].Index("_job");
+
 			//Now let us a build a corresponding vector of SIMC hist files for each input:
+
 			for( size_t pFile = 0; pFile < proton_infile_vec.size(); pFile++ ){
 				cout << pFile << " ";
 				TString temp_filename = proton_infile_vec[pFile];
+
 				temp_filename.ReplaceAll("replayed_digitized_", "");
 				temp_filename.ReplaceAll(Form("/simc/SBS%i/", kine), "/hist/");
 				temp_filename.ReplaceAll(".root", ".hist");
 				// temp_filename.Prepend( Form( "%s/", histfile_dir.Data() ));
 				proton_histfile_vec.push_back(temp_filename);
+
+				//Let us also store the job number from this file so that we can match things up later...
+				//Extract the substring after "_job"
+				TString p_jobNumberStr = "";
+				p_jobNumberStr = proton_infile_vec[pFile]( p_file_job_index + 4, proton_infile_vec[pFile].Length() - p_file_job_index - 9); //9 accounts for lenght of "_job" and ".root"
+				
+				int p_jobNumber = -1;
+				p_jobNumber = p_jobNumberStr.Atoi();
+
+				proton_infile_jobNum_vec.push_back( p_jobNumber );
 
 			//SET UP SOME PROVISIONS IN CASE THE HIST FILE IS MISSING. 
 				double hist_test_var = searchSimcHistFile( "luminosity", proton_histfile_vec[pFile] );
@@ -595,12 +652,22 @@ void simc_dxdy(){
 				// temp_filename.Prepend( Form( "%s/", histfile_dir.Data() ));
 				neutron_histfile_vec.push_back(temp_filename);
 
+				//Let us also store the job number from this file so that we can match things up later...
+				//Extract the substring after "_job"
+				TString n_jobNumberStr = "";
+				n_jobNumberStr = neutron_infile_vec[nFile]( n_file_job_index + 4, neutron_infile_vec[nFile].Length() - n_file_job_index - 9); //9 accounts for lenght of "_job" and ".root"
+				
+				int n_jobNumber = -1;
+				n_jobNumber = n_jobNumberStr.Atoi();
+
+				neutron_infile_jobNum_vec.push_back( n_jobNumber );
+
 			//SET UP SOME PROVISIONS IN CASE THE HIST FILE IS MISSING. 
 				double hist_test_var = searchSimcHistFile( "luminosity", neutron_histfile_vec[nFile] );
 				//If searchSimcHistFile can't access the file it returns the value -99
 				if( hist_test_var == -99 ){
 					missing_nfile_index.push_back(nFile);
-					cout << "ERRRRRROOOOOORRRRRR ------ .hist file not found for pFile: " << nFile << endl;
+					cout << "ERRRRRROOOOOORRRRRR ------ .hist file not found for nFile: " << nFile << endl;
 					cout << "Sleeping to allow for a ctrl-c catch..." << endl;
 					sleep(20);
 					cout << "Exiting...." << endl;
@@ -618,7 +685,29 @@ void simc_dxdy(){
 		}		
 
 		if( !match_file_cnts ){
-			cout << "Adding all proton and neutron simulation files to TChain... " << endl;
+			cout << "-------------------NOT MATCHING FILE COUNTS---------------------" << endl;
+			int p_max_files = 0;
+			int n_max_files = 0;
+
+			if( select_file_cnt ){
+				p_max_files = selected_file_cnt;
+				n_max_files = selected_file_cnt;
+				cout << "Max file cnt selected as: " << selected_file_cnt << endl;
+			}
+
+			if( !select_file_cnt ){
+				cout << "Adding all proton and neutron simulation files to TChain... " << endl;
+				p_max_files = proton_infile_vec.size();
+				n_max_files = neutron_infile_vec.size();
+				cout << "Max file cnt matches infile vector sizes: p = " << proton_infile_vec.size() << ", n = " << neutron_infile_vec.size() << endl;
+			}
+
+			for( int p_file = 0; p_file < p_max_files; p_file++ ){
+				TC->Add(proton_infile_vec[p_file].Data());
+			}
+			for( int n_file = 0; n_file < n_max_files; n_file++ ){
+				TC->Add(neutron_infile_vec[n_file].Data());
+			}
 			// TC->Add(Form("%s/%s", rootfile_dir.Data(), neutron_infile.Data()));
 			// TC->Add(Form("%s/%s", rootfile_dir.Data(), proton_infile.Data()));
 
@@ -657,10 +746,13 @@ void simc_dxdy(){
 			cout << "Nucleon with less file cnts: " << nucleon_with_min_file_cnt_string.Data() << endl;
 			cout << "Number of files for each nucleon to add: " << nucleon_infile_cnt[nucleon_with_min_file_cnt] << endl;
 
+
+			cout << "Adding files to TChain...." << endl;
 			for( size_t infile = 0; infile < nucleon_infile_cnt[nucleon_with_min_file_cnt]; infile++ ){
 				TC->Add( neutron_infile_vec[infile].Data() );
 				TC->Add( proton_infile_vec[infile].Data() );
 			}
+			cout << "Finishing adding files to TChain..." << endl;
 		}
 
 
@@ -855,13 +947,32 @@ void simc_dxdy(){
 			if( use_hist_file ){
 				currentChainFile = TC->GetCurrentFile();
 				currentChainFileName = currentChainFile->GetName();
+
+				//We should compare job numbers now with the index of the infile_vec so that we pull the right value
+				current_file_jobNum_index = -1;
+				current_file_jobNum_index = currentChainFileName.Index("_job");
+
+				TString current_file_jobNumStr = "";
+				current_file_jobNumStr = currentChainFileName(current_file_jobNum_index + 4, currentChainFileName.Length() - current_file_jobNum_index - 9);
+
+				int current_file_jobNum = current_file_jobNumStr.Atoi();
+
 				//From here we can either use mc_fnucl to determine if this is from a proton or neutron
 				//or we can just search through each proton/neutron infile vector for a metching value. 
 				if( is_n ){
 					for( size_t nFileIndex = 0; nFileIndex < neutron_infile_vec.size(); nFileIndex++ ){
 						if( neutron_infile_vec[nFileIndex] == currentChainFileName ){
-							current_file_index = nFileIndex;
-							current_nfile_index = nFileIndex;
+							// cout << "Checking job numbers between neutron hist and input files: " << endl;
+							// cout << "neutron infile: " << current_file_jobNum << ", hist: " << neutron_infile_jobNum_vec[nFileIndex] << endl;
+							
+							if( neutron_infile_jobNum_vec[nFileIndex] == current_file_jobNum ){
+								current_file_index = nFileIndex;
+								current_nfile_index = nFileIndex;								
+							}
+							else{
+								cout << "ERROR: MISMATCH in current neutron file jobNum and current histFile jobNum. nFile index: " << nFileIndex << ", current filename: " << endl;
+								cout << currentChainFileName.Data() << endl;
+							}
 							break;
 						}
 					}
@@ -875,8 +986,18 @@ void simc_dxdy(){
 				if( is_p ){
 					for( size_t pFileIndex = 0; pFileIndex < proton_infile_vec.size(); pFileIndex++ ){
 						if( proton_infile_vec[pFileIndex] == currentChainFileName ){
-							current_file_index = pFileIndex;
-							current_pfile_index = pFileIndex;
+							// cout << "Checking job numbers between proton hist and input files: " << endl;
+							// cout << "proton infile: " << current_file_jobNum << ", hist: " << proton_infile_jobNum_vec[pFileIndex] << endl;
+
+							if( proton_infile_jobNum_vec[pFileIndex] == current_file_jobNum ){
+								current_file_index = pFileIndex;
+								current_pfile_index = pFileIndex;
+							}
+							else{
+								cout << "ERROR: MISMATCH in current proton file jobNum and current histFile jobNum. pFile index: " << pFileIndex << ", current filename: " << endl;
+								cout << currentChainFileName.Data() << endl;
+							}
+
 							break;
 						}
 					}
@@ -937,12 +1058,13 @@ void simc_dxdy(){
 				if( watch_cnt > 0 ){
 					time_for_five.push_back(StopWatch->RealTime());	
 					average_time = VectorMean(time_for_five);
-					cout << "average time for 5 = " << average_time << endl;
+					// cout << "average time for 5 = " << average_time << endl;
 					time_remaining = average_time*( 1.0 - double(nevent)/double(Nevents));
 					cout << "Evt: " << nevent <<"/" << Nevents << Form("(%.0f/100%%)", 100.0*double(1.0*nevent/Nevents)) << ". Elastic yield = " << elastic_yield << ". Time left: " << time_remaining << endl;
 				}
 				StopWatch->Reset();
 				StopWatch->Continue();
+				watch_cnt++;
 			}
 
 	      	if( !correct_beam_energy){
@@ -1060,9 +1182,13 @@ void simc_dxdy(){
 		//Histograms by hadron
 			if( is_p ){
 				h_simc_dx_p->Fill(dx, pn_weight);
+				h_mc_p_sigma->Fill( mc_sigma);
+				h_mc_p_sigma_weighted->Fill( mc_sigma, pn_weight );
 			}
 			if( is_n ){
 				h_simc_dx_n->Fill(dx, pn_weight);
+				h_mc_n_sigma->Fill( mc_sigma);
+				h_mc_n_sigma_weighted->Fill( mc_sigma, pn_weight );
 			}
 
 		// Preliminary HCal projections with single cut on W
@@ -1245,6 +1371,17 @@ void simc_dxdy(){
 				double n_final_weight = h_mc_n_final_weight->GetBinContent(bin);
 				double p_final_weight = h_mc_p_final_weight->GetBinContent(bin);
 				h_mc_n_p_final_weight_Ratio->Fill( p_final_weight/n_final_weight );
+			}
+		}
+
+		//get the MC sigma n/p ratio:
+		for( int bin = 1; bin < h_mc_n_sigma->GetNbinsX(); bin++ ){
+			if( h_mc_p_sigma->GetBinContent(bin) != 0.0 ){
+				double np_ratio = h_mc_n_sigma->GetBinContent(bin)/h_mc_p_sigma->GetBinContent(bin);
+				double np_ratio_weighted = h_mc_n_sigma_weighted->GetBinContent(bin)/h_mc_p_sigma_weighted->GetBinContent(bin);
+
+				h_mc_np_sigma_ratio->SetBinContent(bin, np_ratio);
+				h_mc_np_sigma_ratio_weighted->SetBinContent(bin, np_ratio_weighted);
 			}
 		}
 
