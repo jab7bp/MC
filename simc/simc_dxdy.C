@@ -59,8 +59,8 @@ bool calibrate = true;
 TString hadron_select = "both";
 
 //RUN Info/Parameters
-int kine = 4;
-int sbsfieldscale_select = 30;
+int kine = 9;
+int sbsfieldscale = 70;
 TString run_target = "LD2";
 bool use_particle_gun = false;
 
@@ -75,6 +75,7 @@ double ngen_total = 100000.0;
 // double ngen_total = 4000000.0;
 
 TString rootfile_dir;
+TString dateInfile = "";
 
 TFile *outfile;
 TChain *TC = new TChain("T");
@@ -224,6 +225,7 @@ double dx_n_scale = 1.0;
 bool is_p = false;
 bool is_n = false;
 
+TString SBS4_infile_basename, SBS8_infile_basename, SBS9_infile_basename;
 TString proton_infile, proton_infile_basename, neutron_infile, neutron_infile_basename;
 vector<TString> proton_infile_vec = {};
 vector<TString> proton_histfile_vec = {};
@@ -244,7 +246,7 @@ TString outfilename = "";
 TString portField = "";
 TString numEvents_simFile_str = "";
 
-void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TString portField_select = "" ){
+void simc_dxdy(int kine_select = -1, int sbsfieldscale_select = -1, TString portField_select = "" ){
 	
 	auto total_time_start = high_resolution_clock::now();
 	TStopwatch *StopWatch = new TStopwatch();
@@ -254,17 +256,22 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 	cout << "Analysis started. " << endl;
 	cout << "--------------------------------------" << endl;
 
-	if( kine_select == -1 ){
+	if( kine_select != -1 ){
+		kine_select = kine;
+		cout << "Terminal-line-defined kinematic: " << kine_select << endl;
+	}
+	else{
 		kine_select = kine;
 	}
-	if( sbsfieldscale_select == -1 ){
+	if( sbsfieldscale_select != -1 ){
+		sbsfieldscale_select = sbsfieldscale;
+		cout << "Terminal-line-defined sbsfieldscale: " << sbsfieldscale_select << endl;
+	}
+	else{
 		sbsfieldscale_select = sbsfieldscale;
 	}
-	if( portField_select == "" ){
-		portField = portField_select;
-	}
 
-	I_beam_uA =  = lookup_beam_current( kine_select, run_target );
+	I_beam_uA =  lookup_beam_current( kine_select, run_target );
 	E_beam = lookup_beam_energy_from_kine( kine_select );
 
 	BB_dist = lookup_BB_dist_by_kine( kine );  //Distance to BigBite magnet
@@ -320,17 +327,29 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 	}
 
 	if( kine_select == 4 ){
-		portField_select = "0387";
-		numEvents_simFile_str = "250k"	;
+		portField = "0387";
+		dateInfile = "10_12_2023";
 	}
 	if( kine_select == 8 ){
-		portField_select = "0653";		
+		portField = "0653";
+		dateInfile = "04_11_2023";		
 	}
 	if( kine_select == 9 ){
-		portField_select = "0666";		
+		portField = "0666";		
+		dateInfile = "12_19_2023";	
 	}
 
-	outfilename = Form("rootfiles/simc_SBS%i_%s_mag%i_%suA_port%s_08_12_2023_magcalib%s.root", kine_select, run_target.Data(), sbsfieldscale_select, I_beam_str.Data(), portField_select.Data(), manual_select_file_cnt_str.Data() );
+	if( portField_select != "" ){
+		portField = portField_select;
+		cout << "Terminal-line-defined portField: " << portField_select.Data() << endl;
+		cout << "---------------------------------------" << endl;
+		cout << endl;
+	}
+	else{
+		portField_select = portField;
+	}
+
+	outfilename = Form("rootfiles/simc_SBS%i_%s_mag%i_%suA_port%s_%s%s.root", kine_select, run_target.Data(), sbsfieldscale_select, I_beam_str.Data(), portField_select.Data(), dateInfile.Data(), manual_select_file_cnt_str.Data() );
 
 	if( !plot_only ){
 
@@ -436,12 +455,16 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 		cout << "Adding files to TChain from: " << rootfile_dir.Data() << endl;
 
 		if( kine_select == 4 ){
-			if( run_target == "LD2"){
-				infile = Form("%s/replayed_jb_gmn_SBS4_LD2_mag70_175uA_elas_100k_job*", rootfile_dir.Data());			
-			}
-			else{
-				infile = Form("%s/replayed_jb_gmn_SBS4_LH2_mag0_350uA_pGun_100k_job*", rootfile_dir.Data());
-			}
+
+			SBS4_infile_basename = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS4_LD2_NUCLEON_mag30port%s_175uA_elas_250k_%s_job*.root", portField_select.Data(), dateInfile.Data() );
+
+			// if( run_target == "LD2"){
+			// 	infile = Form("%s/replayed_jb_gmn_SBS4_LD2_mag70_175uA_elas_100k_job*", rootfile_dir.Data());			
+			// }
+			// else{
+			// 	infile = Form("%s/replayed_jb_gmn_SBS4_LH2_mag0_350uA_pGun_100k_job*", rootfile_dir.Data());
+			// }
+
 			// infile = Form("%s/replayed_jb_gmn_SBS%i_%s_mag%imod1_175uA_elas_100k_job*", rootfile_dir.Data(), kine_select, run_target.Data(), sbsfieldscale_select);
 			//Proton file:
 			 
@@ -449,7 +472,10 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 				// proton_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_proton_mag70mod0312_500uA_elas_100k_31_07_2023_job*";
 				// proton_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_proton_mag70mod0312_500uA_elas_500k_02_08_2023_job*";
 
-				proton_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS4_LD2_proton_mag30port%s_175uA_elas_%s_10_12_2023_job*.root", portField_select.Data(), numEvents_simFile_str.Data());
+				// proton_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS4_LD2_proton_mag30port%s_175uA_elas_%s_10_12_2023_job*.root", portField_select.Data(), numEvents_simFile_str.Data());
+				proton_infile = SBS4_infile_basename;
+				proton_infile.ReplaceAll("_NUCLEON_", "_proton_");
+
 				// proton_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_proton_mag70mod0312_500uA_elas_500k_02_08_2023_job10.root*";
 				proton_infile_basename = Form("%s", proton_infile.Data() );
 				proton_infile_basename.ReplaceAll("*.root", "");
@@ -472,7 +498,10 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 				// neutron_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_neutron_mag70mod0312_500uA_elas_100k_31_07_2023_job*";
 				// neutron_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_neutron_mag70mod0312_500uA_elas_500k_02_08_2023_job*";
 				
-				neutron_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS4_LD2_neutron_mag30port%s_175uA_elas_%s_10_12_2023_job*.root", portField_select.Data(), numEvents_simFile_str.Data());
+				// neutron_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS4_LD2_neutron_mag30port%s_175uA_elas_%s_10_12_2023_job*.root", portField_select.Data(), numEvents_simFile_str.Data());
+				neutron_infile = SBS4_infile_basename;
+				neutron_infile.ReplaceAll("_NUCLEON_", "_neutron_");
+
 				// neutron_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_neutron_mag70mod0312_500uA_elas_500k_02_08_2023_job10.root";
 				neutron_infile_basename = Form("%s", neutron_infile.Data() );
 				neutron_infile_basename.ReplaceAll("*.root", "");
@@ -493,13 +522,10 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 		}
 
 		if( kine_select == 8 ){
-			// if( run_target == "LD2" ){
-			// 	infile = Form("%s/replayed_jb_gmn_SBS%i_%s_mag%imod3_%suA_elas_100k_job*", rootfile_dir.Data(), kine_select, run_target.Data(), sbsfieldscale_select, I_beam_str.Data());
-			// }
-			// if( run_target == "LH2" ){
-			// 	// infile = Form("%s/replayed_jb_gmn_SBS%i_%s_mag%i_%suA_elas_100k_job*", rootfile_dir.Data(), kine_select, run_target.Data(), sbsfieldscale_select, I_beam_str.Data());
-			// 	infile = "/lustre19/expphy/volatile/halla/sbs/jboyd/simulation/out_dir/MC_REPLAY_OUT_DIR/replayed_jb_gmn_SBS8_LH2_mag70_elas_500uA_50k_19_07_2023_job*";
-			// }
+			
+			SBS8_infile_basename = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_NUCLEON_mag70port%s_500uA_elas_250k_%s_job*.root", portField_select.Data(), dateInfile.Data());
+
+
 			if( hadron_select == "proton" || hadron_select == "both" ){
 				// proton_infile = "replayed_jb_SIMC_gmn_SBS8_LD2_proton_mag70mod0312_500uA_elas_100k_31_07_2023_job*";
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0301_500uA_elas_250k_24_09_2023_job*.root";
@@ -507,7 +533,11 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0310_500uA_elas_250k_16_10_2023_job*.root";
 				//***
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0310_500uA_elas_250k_03_12_2023_job*.root";
-				proton_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port%s_500uA_elas_250k_04_11_2023_job*.root", portField_select.Data());
+				// proton_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port%s_500uA_elas_250k_04_11_2023_job*.root", portField_select.Data());
+
+				proton_infile = SBS8_infile_basename;
+				proton_infile.ReplaceAll("_NUCLEON_", "_proton_");
+
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_proton_mag70port0800_500uA_elas_100k_04_11_2023_job*.root";
 				proton_infile_basename = Form("%s", proton_infile.Data() );
 				proton_infile_basename.ReplaceAll("*.root", "");
@@ -534,7 +564,11 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0310_500uA_elas_250k_16_10_2023_job*.root";
 				//***
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port0310_500uA_elas_250k_03_12_2023_job*.root";
-				neutron_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port%s_500uA_elas_250k_04_11_2023_job*.root", portField_select.Data());
+				// neutron_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS8_LD2_neutron_mag70port%s_500uA_elas_250k_04_11_2023_job*.root", portField_select.Data());
+
+				neutron_infile = SBS8_infile_basename;
+				neutron_infile.ReplaceAll("_NUCLEON_", "_neutron_");
+
 				neutron_infile_basename = Form("%s", neutron_infile.Data() );
 				neutron_infile_basename.ReplaceAll("*.root", "");
 				cout << "Adding neutron infile names to vector. " << endl;
@@ -555,6 +589,8 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 		}
 
 		if( kine_select == 9 ){
+			
+			SBS9_infile_basename = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_NUCLEON_mag70port%s_1200uA_elas_250k_%s_job*.root", portField_select.Data(), dateInfile.Data());
 
 			if( hadron_select == "proton" || hadron_select == "both" ){
 				cout << "------------------------------------------" << endl;
@@ -562,7 +598,11 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port0314_1200uA_elas_250k_19_09_2023_job*.root";
 				//
 				// proton_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port0314_1200uA_elas_250k_08_10_2023_job*.root";
-				proton_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port%s_1200uA_elas_250k_08_10_2023_job*.root", portField_select.Data());
+				// proton_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_proton_mag70port%s_1200uA_elas_250k_08_10_2023_job*.root", portField_select.Data());
+
+				proton_infile = SBS9_infile_basename;
+				proton_infile.ReplaceAll("_NUCLEON_", "_proton_");
+
 				proton_infile_basename = Form("%s", proton_infile.Data() );
 				proton_infile_basename.ReplaceAll("*.root", "");
 				cout << "Adding proton infile names to vector. " << endl;
@@ -586,7 +626,11 @@ void simc_dxdy(int kine_select = -1, int sbsfieldscale_select_select = -1, TStri
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port0314_1200uA_elas_250k_19_09_2023_job*.root";
 				///
 				// neutron_infile = "replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port0314_1200uA_elas_250k_08_10_2023_job*.root";
-				neutron_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port%s_1200uA_elas_250k_08_10_2023_job*.root", portField_select.Data());
+				// neutron_infile = Form("replayed_digitized_jb_FARM_SIMC_gmn_SBS9_LD2_neutron_mag70port%s_1200uA_elas_250k_08_10_2023_job*.root", portField_select.Data());
+
+				neutron_infile = SBS9_infile_basename;
+				neutron_infile.ReplaceAll("_NUCLEON_", "_neutron_");
+
 				neutron_infile_basename = Form("%s", neutron_infile.Data() );
 				neutron_infile_basename.ReplaceAll("*.root", "");
 				cout << "Adding neutron infile names to vector. " << endl;
